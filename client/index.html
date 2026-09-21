@@ -89,11 +89,13 @@ window.$RefreshSig$ = () => (type) => type;</script>
       #mgebs-theme-toggle.is-switching { transition-duration: 900ms; }
       @media (max-width: 640px) { #mgebs-theme-toggle { top: 10px; right: 10px; width: 36px; height: 36px; } }
       #mgebs-chat-replies { display: flex; flex-direction: column; gap: 10px; margin: 12px 0 0; }
-      .mgebs-reply { border: 1px solid color-mix(in srgb, currentColor 12%, transparent); border-radius: 14px; padding: 12px 14px; background: color-mix(in srgb, Canvas 86%, transparent); white-space: pre-wrap; line-height: 1.55; }
+      .mgebs-reply { border: 0; border-radius: 0; padding: 14px 4px; background: transparent; white-space: pre-wrap; line-height: 1.65; max-width: 760px; margin: 0 auto; }
       .mgebs-reply[data-state='loading'] { opacity: .68; }
       .mgebs-suggestions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
-      .mgebs-suggestion { border: 1px solid color-mix(in srgb, currentColor 16%, transparent); border-radius: 999px; padding: 7px 11px; background: transparent; color: inherit; cursor: inherit; font: inherit; font-size: 12px; }
+      .mgebs-suggestion { border: 1px solid color-mix(in srgb, currentColor 16%, transparent); border-radius: 999px; padding: 7px 11px; background: transparent; color: inherit; cursor: pointer; font: inherit; font-size: 12px; transition: transform .18s ease, background .18s ease; }
       .mgebs-suggestion:hover { background: color-mix(in srgb, currentColor 8%, transparent); }
+      .mgebs-thinking { display:block; width:max-content; margin: 6px 0 0 auto; border:0; color:#a7a7ad; font-size:12px; background:linear-gradient(90deg,#85858c,#f4f4f6,#85858c); background-size:220% auto; -webkit-background-clip:text; background-clip:text; color:transparent; animation:mgebs-silver-shine 2.6s linear infinite; }
+      @keyframes mgebs-silver-shine { to { background-position:220% center; } }
       html, body, button, a, input, textarea, select, [role='button'] {
         cursor: url('/mgebs-cursor.png') 4 4, auto;
       }
@@ -220,6 +222,22 @@ window.$RefreshSig$ = () => (type) => type;</script>
             loading.dataset.mgebsReady = 'true';
             loading.innerHTML = '<img src="' + logo + '" alt="' + brand + '"><span>' + brand + '</span>';
           }
+          document.querySelectorAll('a').forEach(function (link) {
+            var href = link.getAttribute('href') || '';
+            var label = (link.innerText || '').trim();
+            if (href === '/' && /^(Home|الرئيسية)$/i.test(label)) {
+              link.innerText = 'محادثة جديدة';
+              link.setAttribute('aria-label', 'محادثة جديدة');
+            }
+          });
+          document.querySelectorAll('button, a, [role="button"]').forEach(function (el) {
+            if (/actions\.addNewTopic|New conversation|محادثة جديدة/i.test((el.innerText || '').trim())) el.innerText = 'محادثة جديدة';
+          });
+        }
+        function makeAgentChatPrimary() {
+          // The original agent route requires a remote session in this standalone copy.
+          // Keep the working agent-style composer as the primary chat instead of showing a loading screen.
+          return;
         }
         function currentTheme() { return document.documentElement.getAttribute('data-theme') || 'light'; }
         function applyTheme(theme) {
@@ -252,7 +270,13 @@ window.$RefreshSig$ = () => (type) => type;</script>
           var composer = getComposer();
           if (!composer) return null;
           var host = document.getElementById('mgebs-chat-replies');
-          if (!host) { host = document.createElement('div'); host.id = 'mgebs-chat-replies'; composer.parentElement?.appendChild(host); }
+          if (!host) {
+            host = document.createElement('div'); host.id = 'mgebs-chat-replies';
+            host.style.cssText = 'width:100%;max-height:calc(100vh - 260px);overflow:auto;padding:8px 20px 18px;direction:rtl';
+            var shell = composer.parentElement?.parentElement?.parentElement?.parentElement;
+            var composerBlock = composer.parentElement?.parentElement?.parentElement;
+            if (shell && composerBlock) shell.insertBefore(host, composerBlock); else composer.parentElement?.appendChild(host);
+          }
           var reply = document.createElement('div');
           reply.className = 'mgebs-reply';
           if (loading) reply.dataset.state = 'loading';
@@ -260,13 +284,10 @@ window.$RefreshSig$ = () => (type) => type;</script>
           host.appendChild(reply);
           return reply;
         }
-        function addSuggestions(reply, prompt) {
+        function addSuggestions(reply, ideas) {
           var box = document.createElement('div');
           box.className = 'mgebs-suggestions';
-          var ideas = /image|صورة|design|تصميم/i.test(prompt)
-            ? ['صمّم نسخة أكثر حداثة', 'أضف نسخة متجاوبة', 'حسّن الألوان والخطوط', 'أضف ميزة جديدة']
-            : ['وسّع الحل بالتفصيل', 'حوّل النتيجة إلى خطة تنفيذ', 'أضف تصميمًا أجمل', 'أضف ميزة جديدة'];
-          ideas.forEach(function (idea) {
+          (ideas || []).slice(0, 4).forEach(function (idea) {
             var button = document.createElement('button');
             button.type = 'button'; button.className = 'mgebs-suggestion'; button.textContent = idea;
             button.addEventListener('click', function () { var editor = getEditor(); if (!editor) return; editor.textContent = idea; editor.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText', data: idea })); editor.focus(); });
@@ -300,7 +321,7 @@ window.$RefreshSig$ = () => (type) => type;</script>
             if (/api|مفتاح|سر/i.test(prompt)) { showMgebsApiModal(); }
             var sources=[]; if (/ابحث|بحث|مصادر|رابط|أحدث|اليوم|web/i.test(prompt)) { if(pending) pending.textContent='Mgebs AI يبحث في الويب ويقارن المصادر…'; var search=await mgebsRpc('assistant.searchWeb',{query:prompt}); sources=search?.sources||[]; }
             var result=await mgebsRpc('assistant.chat',{messages:state.messages.slice(-14).concat([{role:'user',content:prompt}]).map(function(m){return {role:m.role,content:m.content}}),memory:state.memory,skills:state.skills.map(function(x){return typeof x==='string'?x:(x.title+': '+(x.content||''))}),sources:sources,deepThinking:true});
-            var answer=result?.content||'لم يصل رد من Mgebs AI.'; if(pending){pending.dataset.state='';pending.textContent=answer; if(result?.thinking){var think=document.createElement('small');think.style.cssText='display:block;opacity:.65;margin-top:8px';think.textContent='التفكير العميق: '+result.thinking;pending.appendChild(think);} addSuggestions(pending,prompt); if(result?.artifact) addMgebsArtifact(pending,result.artifact.code,result.artifact.language);}
+            var answer=result?.content||'لم يصل رد من Mgebs AI.'; if(pending){pending.dataset.state='';pending.textContent=answer; if(result?.thinking){var think=document.createElement('small');think.className='mgebs-thinking';think.textContent='التفكير العميق · '+result.thinking;pending.appendChild(think);} addSuggestions(pending,result?.suggestions); if(result?.artifact) addMgebsArtifact(pending,result.artifact.code,result.artifact.language);}
             state.messages.push({role:'user',content:prompt},{role:'assistant',content:answer}); if(result?.memory) state.memory.push(result.memory); saveMgebsState(state);
           } catch (error) { if(pending){pending.dataset.state='';pending.textContent=error instanceof Error?error.message:'تعذر تشغيل Mgebs AI';} } finally { button.dataset.mgebsSending='false'; button.disabled=false; }
           if (editor) { editor.textContent=''; editor.dispatchEvent(new InputEvent('input',{bubbles:true,inputType:'deleteContentBackward'})); }
@@ -358,7 +379,7 @@ window.$RefreshSig$ = () => (type) => type;</script>
           document.body.appendChild(button);
           applyTheme(currentTheme());
         }
-        function bootMgebs() { applyBranding(); applyTimeGreeting(); ensureThemeButton(); installChatBridge(); repairResourceEmptyStates(); document.querySelectorAll('button').forEach(function(b){if(!b.dataset.mgebsApiHook && /API|api|سرية|secret/i.test((b.innerText||'')+' '+(b.getAttribute('aria-label')||''))){b.dataset.mgebsApiHook='1';b.addEventListener('click',showMgebsApiModal,true);}}); }
+        function bootMgebs() { makeAgentChatPrimary(); applyBranding(); applyTimeGreeting(); ensureThemeButton(); installChatBridge(); repairResourceEmptyStates(); document.querySelectorAll('button').forEach(function(b){if(!b.dataset.mgebsApiHook && /API|api|سرية|secret/i.test((b.innerText||'')+' '+(b.getAttribute('aria-label')||''))){b.dataset.mgebsApiHook='1';b.addEventListener('click',showMgebsApiModal,true);}}); }
         document.addEventListener('DOMContentLoaded', bootMgebs);
         new MutationObserver(bootMgebs).observe(document.documentElement, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ['src', 'alt', 'title', 'aria-label'] });
       })();
