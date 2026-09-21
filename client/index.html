@@ -274,24 +274,36 @@ window.$RefreshSig$ = () => (type) => type;</script>
           });
           reply?.appendChild(box);
         }
+        function mgebsVisitorId() {
+          var id = localStorage.getItem('mgebs-visitor-id');
+          if (!id) { id = 'visitor-' + (crypto.randomUUID ? crypto.randomUUID() : Date.now()); localStorage.setItem('mgebs-visitor-id', id); }
+          return id;
+        }
+        async function mgebsRpc(path, input) {
+          var response = await fetch('/api/trpc/' + path + '?batch=1', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ 0: { json: input } }) });
+          if (!response.ok) throw new Error('RPC ' + response.status);
+          var data = await response.json(); return data[0]?.result?.data?.json || data[0]?.result?.data;
+        }
+        function mgebsState() { try { return JSON.parse(localStorage.getItem('mgebs-state') || '{}'); } catch (_) { return {}; } }
+        function saveMgebsState(state) { localStorage.setItem('mgebs-state', JSON.stringify(state)); mgebsRpc('workspace.save', { visitorId: mgebsVisitorId(), messages: state.messages || [], memory: state.memory || [], skills: state.skills || [], secrets: state.secrets || [] }).catch(function(){}); }
+        function showMgebsApiModal() {
+          if (document.getElementById('mgebs-api-modal')) return;
+          var modal = document.createElement('div'); modal.id = 'mgebs-api-modal'; modal.style.cssText = 'position:fixed;inset:0;z-index:100001;display:grid;place-items:center;background:rgba(0,0,0,.28);backdrop-filter:blur(8px)';
+          modal.innerHTML = '<div style="width:min(460px,calc(100vw - 32px));padding:22px;border-radius:18px;background:Canvas;color:CanvasText;box-shadow:0 18px 60px rgba(0,0,0,.22);direction:rtl"><h3 style="margin:0 0 8px">إضافة API للمهمة</h3><p style="opacity:.7;font-size:13px">يحفظ المفتاح محلياً ويمكن لـ Mgebs استخدامه عند الحاجة.</p><input id="mgebs-api-name" placeholder="اسم المفتاح" style="width:100%;margin:8px 0;padding:10px;border-radius:10px;border:1px solid #999"><input id="mgebs-api-value" type="password" placeholder="قيمة API" style="width:100%;margin:8px 0;padding:10px;border-radius:10px;border:1px solid #999"><div style="display:flex;gap:8px;justify-content:flex-start;margin-top:12px"><button id="mgebs-api-save" style="padding:9px 14px;border-radius:10px;border:0;background:#6956d9;color:#fff">حفظ</button><button id="mgebs-api-close" style="padding:9px 14px;border-radius:10px">إلغاء</button></div></div>';
+          document.body.appendChild(modal); modal.querySelector('#mgebs-api-close').onclick=function(){modal.remove()}; modal.querySelector('#mgebs-api-save').onclick=function(){var state=mgebsState(); state.secrets=state.secrets||[]; state.secrets.push({id:String(Date.now()),name:modal.querySelector('#mgebs-api-name').value,value:modal.querySelector('#mgebs-api-value').value}); saveMgebsState(state); modal.remove();};
+        }
+        function addMgebsArtifact(reply, code, language) { var box=document.createElement('div'); box.style.cssText='margin-top:10px;padding:10px;border:1px solid color-mix(in srgb,currentColor 15%,transparent);border-radius:12px'; box.innerHTML='<b>مخرج قابل للمعاينة</b><br><button type="button" style="margin-top:8px">معاينة</button> <button type="button" style="margin-top:8px">تنزيل</button>'; var buttons=box.querySelectorAll('button'); buttons[0].onclick=function(){var editor=document.createElement('textarea');editor.value=code;editor.style.cssText='position:fixed;inset:10%;z-index:100002;padding:18px;border-radius:14px;background:Canvas;color:CanvasText';document.body.appendChild(editor);editor.focus();}; buttons[1].onclick=function(){var a=document.createElement('a');a.href=URL.createObjectURL(new Blob([code],{type:'text/plain'}));a.download='mgebs-output.'+(language||'txt');a.click();}; reply.appendChild(box); }
         async function sendMgebsMessage(button) {
-          var editor = getEditor();
-          var prompt = getMessageText(editor);
-          if (!prompt || button.dataset.mgebsSending === 'true') return;
-          button.dataset.mgebsSending = 'true';
-          button.disabled = true;
-          var pending = addReply('Mgebs AI is thinking…', true);
+          var editor = getEditor(); var prompt = getMessageText(editor); if (!prompt || button.dataset.mgebsSending === 'true') return;
+          button.dataset.mgebsSending = 'true'; button.disabled = true; var pending = addReply('Mgebs AI يفكر ويحدد المهارة المناسبة…', true); var state=mgebsState(); state.messages=state.messages||[]; state.memory=state.memory||[]; state.skills=state.skills||[];
           try {
-            var response = await fetch('/api/nvidia/chat', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ messages: [{ role: 'user', content: prompt }], max_tokens: 2048, temperature: 0.6, stream: false }) });
-            var data = await response.json();
-            if (!response.ok) throw new Error(data?.error?.message || 'The AI request failed');
-            var message = data?.choices?.[0]?.message || {};
-            var answer = message.content || message.reasoning_content || message.reasoning || 'No answer was returned.';
-            if (pending) { pending.dataset.state = ''; pending.textContent = answer; addSuggestions(pending, prompt); }
-            if (editor) { editor.textContent = ''; editor.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'deleteContentBackward' })); }
-          } catch (error) {
-            if (pending) { pending.dataset.state = ''; pending.textContent = error instanceof Error ? error.message : 'The AI request failed'; }
-          } finally { button.dataset.mgebsSending = 'false'; button.disabled = false; }
+            if (/api|مفتاح|سر/i.test(prompt)) { showMgebsApiModal(); }
+            var sources=[]; if (/ابحث|بحث|مصادر|رابط|أحدث|اليوم|web/i.test(prompt)) { if(pending) pending.textContent='Mgebs AI يبحث في الويب ويقارن المصادر…'; var search=await mgebsRpc('assistant.searchWeb',{query:prompt}); sources=search?.sources||[]; }
+            var result=await mgebsRpc('assistant.chat',{messages:state.messages.slice(-14).concat([{role:'user',content:prompt}]).map(function(m){return {role:m.role,content:m.content}}),memory:state.memory,skills:state.skills.map(function(x){return typeof x==='string'?x:(x.title+': '+(x.content||''))}),sources:sources,deepThinking:true});
+            var answer=result?.content||'لم يصل رد من Mgebs AI.'; if(pending){pending.dataset.state='';pending.textContent=answer; if(result?.thinking){var think=document.createElement('small');think.style.cssText='display:block;opacity:.65;margin-top:8px';think.textContent='التفكير العميق: '+result.thinking;pending.appendChild(think);} addSuggestions(pending,prompt); if(result?.artifact) addMgebsArtifact(pending,result.artifact.code,result.artifact.language);}
+            state.messages.push({role:'user',content:prompt},{role:'assistant',content:answer}); if(result?.memory) state.memory.push(result.memory); saveMgebsState(state);
+          } catch (error) { if(pending){pending.dataset.state='';pending.textContent=error instanceof Error?error.message:'تعذر تشغيل Mgebs AI';} } finally { button.dataset.mgebsSending='false'; button.disabled=false; }
+          if (editor) { editor.textContent=''; editor.dispatchEvent(new InputEvent('input',{bubbles:true,inputType:'deleteContentBackward'})); }
         }
         function installChatBridge() {
           var composer = getComposer();
@@ -335,7 +347,7 @@ window.$RefreshSig$ = () => (type) => type;</script>
           document.body.appendChild(button);
           applyTheme(currentTheme());
         }
-        function bootMgebs() { applyBranding(); applyTimeGreeting(); ensureThemeButton(); installChatBridge(); }
+        function bootMgebs() { applyBranding(); applyTimeGreeting(); ensureThemeButton(); installChatBridge(); document.querySelectorAll('button').forEach(function(b){if(!b.dataset.mgebsApiHook && /API|api|سرية|secret/i.test((b.innerText||'')+' '+(b.getAttribute('aria-label')||''))){b.dataset.mgebsApiHook='1';b.addEventListener('click',showMgebsApiModal,true);}}); }
         document.addEventListener('DOMContentLoaded', bootMgebs);
         new MutationObserver(bootMgebs).observe(document.documentElement, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ['src', 'alt', 'title', 'aria-label'] });
       })();
@@ -353,6 +365,27 @@ window.$RefreshSig$ = () => (type) => type;</script>
           }
           return nativeFetch(input, init);
         };
+      })();
+    </script>
+    <script>
+      (function () {
+        function revealMgebs() {
+          var loading = document.getElementById('loading-screen');
+          var root = document.getElementById('root');
+          if (!root) return;
+          document.querySelectorAll('button').forEach(function (button) {
+            var label = (button.getAttribute('aria-label') || button.title || '').toLowerCase();
+            if (label === 'close' && document.body.innerText.indexOf('There is a new version for the web app') >= 0) button.click();
+          });
+          if (!loading) return;
+          var visibleApp = root.querySelector('[data-testid], main, nav, textarea, button');
+          if (visibleApp || root.textContent.indexOf('Good morning') >= 0 || root.textContent.indexOf('Mgebs AI') >= 0) {
+            loading.remove();
+          }
+        }
+        document.addEventListener('DOMContentLoaded', revealMgebs);
+        new MutationObserver(revealMgebs).observe(document.documentElement, { childList: true, subtree: true });
+        setTimeout(function () { var loading = document.getElementById('loading-screen'); if (loading) loading.remove(); }, 3500);
       })();
     </script>
     <script type="module" crossorigin src="/_spa/assets/index-w64_zsxD.js"></script>
