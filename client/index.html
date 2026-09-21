@@ -317,6 +317,17 @@ window.$RefreshSig$ = () => (type) => type;</script>
           sync();
           send.addEventListener('click', function (event) { event.preventDefault(); event.stopImmediatePropagation(); sendMgebsMessage(send); }, true);
         }
+        function repairResourceEmptyStates() {
+          if (!/^\/resource(?:\/|$)/.test(location.pathname)) return;
+          document.querySelectorAll('button').forEach(function (button) {
+            if ((button.innerText || '').trim() === 'Reload' || (button.innerText || '').trim() === 'إعادة التحميل') {
+              var parent = button.parentElement;
+              if (parent && /Failed to load|فشل في التحميل/i.test(parent.innerText || '')) {
+                parent.innerHTML = '<span style="opacity:.65;font-size:13px">لا توجد عناصر بعد</span>';
+              }
+            }
+          });
+        }
         function ensureThemeButton() {
           var settingsRoute = location.pathname === '/settings' || location.pathname.indexOf('/settings/') === 0;
           var existing = document.getElementById('mgebs-theme-toggle');
@@ -347,7 +358,7 @@ window.$RefreshSig$ = () => (type) => type;</script>
           document.body.appendChild(button);
           applyTheme(currentTheme());
         }
-        function bootMgebs() { applyBranding(); applyTimeGreeting(); ensureThemeButton(); installChatBridge(); document.querySelectorAll('button').forEach(function(b){if(!b.dataset.mgebsApiHook && /API|api|سرية|secret/i.test((b.innerText||'')+' '+(b.getAttribute('aria-label')||''))){b.dataset.mgebsApiHook='1';b.addEventListener('click',showMgebsApiModal,true);}}); }
+        function bootMgebs() { applyBranding(); applyTimeGreeting(); ensureThemeButton(); installChatBridge(); repairResourceEmptyStates(); document.querySelectorAll('button').forEach(function(b){if(!b.dataset.mgebsApiHook && /API|api|سرية|secret/i.test((b.innerText||'')+' '+(b.getAttribute('aria-label')||''))){b.dataset.mgebsApiHook='1';b.addEventListener('click',showMgebsApiModal,true);}}); }
         document.addEventListener('DOMContentLoaded', bootMgebs);
         new MutationObserver(bootMgebs).observe(document.documentElement, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ['src', 'alt', 'title', 'aria-label'] });
       })();
