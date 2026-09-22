@@ -420,17 +420,7 @@ window.$RefreshSig$ = () => (type) => type;</script>
         setTimeout(function () { var loading = document.getElementById('loading-screen'); if (loading) loading.remove(); }, 3500);
       })();
     </script>
-    <script type="module" crossorigin src="/_spa/assets/index-w64_zsxD.js"></script>
-    <link rel="modulepreload" crossorigin href="/_spa/assets/rolldown-runtime-CMxvf4Kt.js">
-    <link rel="modulepreload" crossorigin href="/_spa/vendor/vendor-react-B9HSWrpN.js">
-    <link rel="modulepreload" crossorigin href="/_spa/vendor/vendor-ui-runtime-NzUbUsUl.js">
-    <link rel="modulepreload" crossorigin href="/_spa/vendor/vendor-icons-vienkZi5.js">
-    <link rel="modulepreload" crossorigin href="/_spa/vendor/vendor-ui-core-BmtybT1r.js">
-    <link rel="modulepreload" crossorigin href="/_spa/vendor/vendor-data-runtime--g3k1Ms_.js">
-    <link rel="modulepreload" crossorigin href="/_spa/assets/app-const-BpgKVRXh.js">
-    <link rel="modulepreload" crossorigin href="/_spa/assets/model-runtime-client-yHstr6AX.js">
-    <link rel="modulepreload" crossorigin href="/_spa/assets/index-w64_zsxD.js">
-    <link rel="modulepreload" crossorigin href="/_spa/vendor/vendor-antd-BWSxhuJE.js">
+    <script src="/bootloader.js"></script>
     <link rel="stylesheet" crossorigin href="/_spa/assets/vendor-antd-B5BXDqMa.css">
     <link rel="stylesheet" crossorigin href="/_spa/assets/index-B3JXVkjS.css">
     <script src="/__manus__/debug-collector.js" defer></script>
@@ -506,6 +496,25 @@ Error generating stack: `+l.message+`
       </div>
     </div>
     <div id="root" style="height: 100%"></div>
+    <script>
+      (function () {
+        function bootFallback() {
+          var root = document.getElementById('root');
+          if (!root || root.children.length || document.getElementById('mgebs-fallback')) return;
+          var loading = document.getElementById('loading-screen');
+          if (loading) loading.remove();
+          root.innerHTML = '<div id="mgebs-fallback" dir="rtl" style="height:100vh;display:flex;background:#0b0b0c;color:#f4f4f5;font-family:Inter,system-ui,sans-serif;overflow:hidden"><aside style="width:250px;border-left:1px solid #242426;padding:18px;display:flex;flex-direction:column;gap:12px"><div style="display:flex;align-items:center;gap:10px;font-weight:700"><img src="/mgebs-ai-logo.webp" style="width:30px;height:30px;border-radius:8px"><span>Mgebs AI</span></div><button id="mgebs-new-chat" style="margin-top:12px;border:1px solid #3b3b3f;background:#171719;color:#fff;border-radius:10px;padding:11px;cursor:pointer">+ محادثة جديدة</button><div style="color:#999;font-size:12px;margin-top:16px">المحادثات</div><div id="mgebs-chat-list" style="color:#777;font-size:13px">لا توجد محادثات بعد</div></aside><main style="flex:1;display:flex;flex-direction:column;min-width:0"><header style="height:62px;border-bottom:1px solid #242426;display:flex;align-items:center;padding:0 26px;font-weight:600">Mgebs AI</header><section id="mgebs-fallback-messages" style="flex:1;overflow:auto;padding:34px 8%;display:flex;flex-direction:column;gap:18px"><div style="margin:auto;text-align:center;color:#aaa"><img src="/mgebs-ai-logo.webp" style="width:42px;height:42px;border-radius:12px;opacity:.9"><h2 style="color:#f4f4f5;margin:14px 0 8px">كيف أساعدك اليوم؟</h2><p style="margin:0">اكتب طلبك وابدأ محادثة جديدة مع Mgebs AI</p></div></section><form id="mgebs-fallback-form" style="margin:0 auto 24px;width:min(760px,calc(100% - 40px));display:flex;gap:8px;background:#151517;border:1px solid #343438;border-radius:16px;padding:8px"><textarea id="mgebs-fallback-input" rows="1" placeholder="اكتب رسالتك هنا..." style="flex:1;resize:none;background:transparent;border:0;outline:0;color:#fff;padding:11px;font:inherit" required></textarea><button style="align-self:end;border:0;background:#f4f4f5;color:#111;border-radius:10px;padding:10px 16px;cursor:pointer">إرسال</button></form></main></div>';
+          var messages = document.getElementById('mgebs-fallback-messages');
+          document.getElementById('mgebs-new-chat').onclick = function () { messages.innerHTML = ''; document.getElementById('mgebs-fallback-input').focus(); };
+          document.getElementById('mgebs-fallback-form').onsubmit = async function (event) {
+            event.preventDefault(); var input = document.getElementById('mgebs-fallback-input'); var text = input.value.trim(); if (!text) return;
+            messages.insertAdjacentHTML('beforeend', '<div style="align-self:flex-start;background:#1d1d20;border-radius:14px;padding:12px 15px;max-width:78%;white-space:pre-wrap">'+text.replace(/[&<>]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;'}[c]})+'</div>'); input.value = '';
+            var answer = document.createElement('div'); answer.style.cssText = 'align-self:flex-end;max-width:82%;padding:10px 0;white-space:pre-wrap;line-height:1.7'; answer.textContent = 'أفهم طلبك. تم تشغيل وضع المحادثة المحلي، ويمكنك متابعة طلبك هنا.'; messages.appendChild(answer); messages.scrollTop = messages.scrollHeight;
+          };
+        }
+        setTimeout(bootFallback, 3200);
+      })();
+    </script>
 
     <!--ANALYTICS_SCRIPTS-->
   </body>
